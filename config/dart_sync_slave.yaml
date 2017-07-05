@@ -6,7 +6,7 @@ basler_params:
   -
     name: ExposureTime
     type: float
-    value: 15000.0
+    value: 5000.0
   -
     name: AcquisitionMode
     type: enum
@@ -30,7 +30,7 @@ basler_params:
   -
     name: BalanceWhiteAuto
     type: enum
-    value: 'Off'
+    value: 'Once'
   -
     name: BalanceRatioSelector
     type: enum
@@ -50,11 +50,11 @@ basler_params:
   -
     name: TriggerSource
     type: enum
-    value: Line2
+    value: Out1
   -
     name: LineSelector
     type: enum
-    value: Line2
+    value: Out1
   -
     name: LineMode
     type: enum
