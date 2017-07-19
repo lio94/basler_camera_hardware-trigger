@@ -218,11 +218,13 @@ int main(int argc, char* argv[])
             else 
             {
                 // Look up the camera by its serial number
+                ROS_INFO_STREAM("Camera serials found: ");
                 for (size_t i=0; i<devices.size(); i++) 
                 {
+                    ROS_INFO_STREAM(devices[i].GetSerialNumber());
                     if (devices[i].GetSerialNumber().c_str() == serial_number) 
                     {
-                        ROS_INFO_STREAM("Found camera with serial " << serial_number);
+                        ROS_INFO_STREAM("Found camera with matching serial " << serial_number);
                         camera.Attach(tlFactory.CreateDevice(devices[i]));
                         camera_found = true;
                     }
