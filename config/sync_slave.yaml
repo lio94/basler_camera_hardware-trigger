@@ -6,7 +6,7 @@ basler_params:
   -
     name: ExposureTimeAbs
     type: float
-    value: 8000.0
+    value: 100000.0
   -
     name: AcquisitionMode
     type: enum
