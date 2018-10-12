@@ -180,7 +180,9 @@ int main(int argc, char* argv[])
     if(!pnh.getParam("serial_number", serial_number))
         serial_number = "";
 
-    std::string camera_name = nh.getNamespace();
+    std::string camera_name;
+    if(!pnh.getParam("camera_name", camera_name))
+        camera_name = "camera";
 
     int exitCode = 0;
 
