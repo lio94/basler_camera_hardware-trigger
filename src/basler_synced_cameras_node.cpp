@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
 
         sensor_msgs::CameraInfo::Ptr cinfo(
             new sensor_msgs::CameraInfo(cinfo_manager.getCameraInfo()));
-        cameras[i].RegisterImageEventHandler(new Pylon::ImagePublisher(nh, cinfo, frame_id, name + "/"), Pylon::RegistrationMode_Append, Pylon::Cleanup_Delete);
+        cameras[i].RegisterImageEventHandler(new Pylon::ImagePublisher(nh, cinfo, frame_id, name + "/", true), Pylon::RegistrationMode_Append, Pylon::Cleanup_Delete);
         cameras[i].RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration, Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
     }
 

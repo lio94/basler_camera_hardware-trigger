@@ -23,8 +23,8 @@ namespace Pylon
   {
   public:
 
-    ImagePublisher(ros::NodeHandle nh, sensor_msgs::CameraInfo::Ptr cinfo, string frame_id, string topic_prefix = "")
-      : nh_(nh), it_(nh_) {
+    ImagePublisher(ros::NodeHandle nh, sensor_msgs::CameraInfo::Ptr cinfo, string frame_id, string topic_prefix = "", bool use_camera_time = false)
+      : nh_(nh), it_(nh_), use_camera_time_(use_camera_time) {
       cam_pub_ = it_.advertiseCamera(topic_prefix + "image_raw", 1);
       converter_.OutputPixelFormat = PixelType_RGB8packed;
       cinfo_ = cinfo;
@@ -39,19 +39,16 @@ namespace Pylon
     virtual void OnImageGrabbed( CInstantCamera& camera, const CGrabResultPtr& ptrGrabResult)
     {
       ROS_DEBUG_STREAM("*OnImageGrabbed event for device " << camera.GetDeviceInfo().GetModelName());
-
-      ros::Time timestamp = ros::Time::now();
-      GenApi::CIntegerPtr width(camera.GetNodeMap().GetNode("Width"));
-      GenApi::CIntegerPtr height(camera.GetNodeMap().GetNode("Height"));
-      cv::Mat cv_img_rgb(width->GetValue(), height->GetValue(), CV_8UC3);
-
       if (ptrGrabResult->GrabSucceeded())
       {
         converter_.Convert(pylon_image_, ptrGrabResult);
 
-        cv_img_rgb = cv::Mat(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(), CV_8UC3,(uint8_t*)pylon_image_.GetBuffer());
+        cv::Mat cv_img_rgb = cv::Mat(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(), CV_8UC3,(uint8_t*)pylon_image_.GetBuffer());
         sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "rgb8", cv_img_rgb).toImageMsg();
         sensor_msgs::CameraInfo::Ptr cinfo = cinfo_;
+
+        ros::Time timestamp = use_camera_time_ ? ros::Time().fromNSec(ptrGrabResult->GetTimeStamp())
+          : ros::Time::now();
 
         image->header.frame_id = frame_id_;
         image->header.stamp = timestamp;
@@ -75,6 +72,7 @@ namespace Pylon
     CImageFormatConverter converter_;
     CPylonImage pylon_image_;
     EPixelType pixel_type_;
+    bool use_camera_time_;
   };
 }
 
