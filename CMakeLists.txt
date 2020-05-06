@@ -35,22 +35,21 @@ link_directories(
   $ENV{GENICAM_ROOT_V2_3}/library/CPP/lib/Linux64_x64
 )
 
-## Declare a C++ library
-#add_library(basler_camera src/basler_camera_node.cpp)
-#add_dependencies(basler_camera ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Declare a C++ executable
-add_executable(basler_camera_node src/basler_camera_node.cpp)
+## Declare C++ executables
+add_executable(basler_camera_node src/basler_camera_node.cpp src/basler_parameters.cpp)
 add_dependencies(basler_camera_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(basler_synced_cameras_node src/basler_synced_cameras_node.cpp src/basler_parameters.cpp)
+add_dependencies(basler_synced_cameras_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(basler_camera_node
   ${OpenCV_LIBS}
   ${catkin_LIBRARIES}
   ${Pylon_LIBRARIES}
-  ##pylonbase
-  ##pylonutility
-  ##GCBase_gcc_v3_0_Basler_pylon_v5_0
-  ##GenApi_gcc_v3_0_Basler_pylon_v5_0
-) 
-
+  )
+target_link_libraries(basler_synced_cameras_node
+  ${OpenCV_LIBS}
+  ${catkin_LIBRARIES}
+  ${Pylon_LIBRARIES}
+)

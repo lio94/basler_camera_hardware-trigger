@@ -11,6 +11,8 @@
 
 #include <ros/console.h>
 #include <camera_info_manager/camera_info_manager.h>
+#include <cv_bridge/cv_bridge.h>
+#include <image_transport/image_transport.h>
 
 namespace Pylon
 {
@@ -21,9 +23,9 @@ namespace Pylon
   {
   public:
 
-    ImagePublisher(ros::NodeHandle nh, sensor_msgs::CameraInfo::Ptr cinfo, string frame_id)
+    ImagePublisher(ros::NodeHandle nh, sensor_msgs::CameraInfo::Ptr cinfo, string frame_id, string topic_prefix = "")
       : nh_(nh), it_(nh_) {
-      cam_pub_ = it_.advertiseCamera("image_raw", 1);
+      cam_pub_ = it_.advertiseCamera(topic_prefix + "image_raw", 1);
       converter_.OutputPixelFormat = PixelType_RGB8packed;
       cinfo_ = cinfo;
       frame_id_ = frame_id;
