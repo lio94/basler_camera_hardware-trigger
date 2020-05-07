@@ -1,18 +1,16 @@
 #ifndef INCLUDED_IMAGEPUBLISHER
 #define INCLUDED_IMAGEPUBLISHER
 
-#include <pylon/ImageEventHandler.h>
-#include <pylon/GrabResultPtr.h>
-
-#include <pylon/PylonIncludes.h>
-#include <pylon/PylonImage.h>
-#include <pylon/Pixel.h>
-#include <pylon/ImageFormatConverter.h>
-
-#include <ros/console.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <pylon/ImageEventHandler.h>
+#include <pylon/ImageFormatConverter.h>
+#include <pylon/GrabResultPtr.h>
+#include <pylon/Pixel.h>
+#include <pylon/PylonIncludes.h>
+#include <pylon/PylonImage.h>
+#include <ros/console.h>
 
 namespace Pylon
 {
