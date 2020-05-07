@@ -7,21 +7,23 @@
 
 #include "basler_parameters.h"
 
-void handle_basler_bool_parameter(Pylon::CInstantCamera& camera, std::string name, bool value)
+namespace
+{
+template <typename T, typename NodePtrT>
+void handle_basler_parameter(Pylon::CInstantCamera& camera, const std::string& name, const T& value)
 {
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
-        ROS_INFO_STREAM("Setting int param " << name << " to " << value << ".");
-        GenApi::CBooleanPtr this_node(nodemap.GetNode(name.c_str()));
+        NodePtrT this_node(nodemap.GetNode(name.c_str()));
         if (!IsWritable(this_node))
         {
-            ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
+            ROS_ERROR_STREAM("Basler parameter '" << name << "' not implemented ");
             ROS_ERROR_STREAM(name << " set to " << this_node->GetValue());
             return;
         }
         this_node->SetValue(value);
-        ROS_INFO_STREAM(name << " set to " << this_node->GetValue());
+        ROS_DEBUG_STREAM(name << " set to " << this_node->GetValue());
     }
     catch (const Pylon::GenericException& e)
     {
@@ -29,61 +31,16 @@ void handle_basler_bool_parameter(Pylon::CInstantCamera& camera, std::string nam
     }
 }
 
-void handle_basler_int_parameter(Pylon::CInstantCamera& camera, std::string name, int value)
+void handle_basler_enum_parameter(Pylon::CInstantCamera& camera, const std::string& name, const std::string& value)
 {
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
-        ROS_INFO_STREAM("Setting int param " << name << " to " << value << ".");
-        GenApi::CIntegerPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsWritable(this_node))
-        {
-            ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-            ROS_ERROR_STREAM(name << " set to " << this_node->GetValue());
-            return;
-        }
-        this_node->SetValue(value);
-        ROS_INFO_STREAM(name << " set to " << this_node->GetValue());
-    }
-    catch (const Pylon::GenericException& e)
-    {
-        ROS_ERROR_STREAM(e.GetDescription());
-    }
-}
-
-void handle_basler_float_parameter(Pylon::CInstantCamera& camera, std::string name, double value)
-{
-    GenApi::INodeMap& nodemap = camera.GetNodeMap();
-    try
-    {
-        ROS_INFO_STREAM("Setting float param " << name << " to " << value << ".");
-        GenApi::CFloatPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsImplemented(this_node))
-        {
-            ROS_ERROR_STREAM("Basler float parameter '" << name << "' not implemented ");
-            ROS_ERROR_STREAM(name << " set to " << this_node->GetValue());
-            return;
-        }
-        this_node->SetValue(value);
-        ROS_INFO_STREAM(name << " set to " << this_node->GetValue());
-    }
-    catch (const Pylon::GenericException& e)
-    {
-        ROS_ERROR_STREAM(e.GetDescription());
-    }
-}
-
-void handle_basler_enum_parameter(Pylon::CInstantCamera& camera, std::string name, std::string value)
-{
-    GenApi::INodeMap& nodemap = camera.GetNodeMap();
-    try
-    {
-        ROS_INFO_STREAM("Setting enum param " << name << " to " << value << ".");
         GenApi::CEnumerationPtr this_node(nodemap.GetNode(name.c_str()));
         if (!IsWritable(this_node))
         {
             ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-
+            ROS_ERROR_STREAM(name << " set to " << this_node->ToString());
             return;
         }
         if (!IsAvailable(this_node->GetEntryByName(value.c_str())))
@@ -92,7 +49,7 @@ void handle_basler_enum_parameter(Pylon::CInstantCamera& camera, std::string nam
             return;
         }
         this_node->FromString(value.c_str());
-        //ROS_INFO_STREAM(name << " set to " << this_node->GetValue());
+        ROS_DEBUG_STREAM(name << " set to " << this_node->ToString());
     }
     catch (const Pylon::GenericException& e)
     {
@@ -100,38 +57,7 @@ void handle_basler_enum_parameter(Pylon::CInstantCamera& camera, std::string nam
     }
 }
 
-void handle_basler_parameter(Pylon::CInstantCamera& camera, XmlRpc::XmlRpcValue& param)
-{
-    std::string type = param["type"];
-    if ("int" == type)
-    {
-        ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeInt,
-                       "Type of value for %s must be int", std::string(param["name"]).c_str());
-        handle_basler_int_parameter(camera, param["name"], param["value"]);
-    }
-    else if ("float" == type)
-    {
-        ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeDouble,
-                       "Type of value for %s must be float", std::string(param["name"]).c_str());
-        handle_basler_float_parameter(camera, param["name"], param["value"]);
-    }
-    else if ("enum" == type)
-    {
-        ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeString,
-                       "Type of value for %s must be string", std::string(param["name"]).c_str());
-        handle_basler_enum_parameter(camera, param["name"], param["value"]);
-    }
-    else if ("bool" == type)
-    {
-        ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeBoolean,
-                       "Type of value for %s must be string", std::string(param["name"]).c_str());
-        handle_basler_bool_parameter(camera, param["name"], param["value"]);
-    }
-    else
-    {
-        ROS_FATAL_STREAM("Unknown param type for parameter " << param["name"] << ": " << type);
-    }
-}
+} // anonymous namespace
 
 void handle_basler_parameters(Pylon::CInstantCamera& camera)
 {
@@ -141,11 +67,42 @@ void handle_basler_parameters(Pylon::CInstantCamera& camera)
     ROS_ASSERT_MSG(params.getType() == XmlRpc::XmlRpcValue::TypeArray, "Badly formed basler param yaml");
     for (size_t index = 0; index < params.size(); ++index)
     {
-        ROS_ASSERT_MSG(params[index].getType() == XmlRpc::XmlRpcValue::TypeStruct, "Badly formed basler param yaml");
-        ROS_ASSERT_MSG(params[index].hasMember("name"), "Param needs name");
-        ROS_ASSERT_MSG(params[index].hasMember("type"), "Param needs type");
-        ROS_ASSERT_MSG(params[index].hasMember("value"), "Param needs value");
-
-        handle_basler_parameter(camera, params[index]);
+        const auto& param = params[index];
+        ROS_ASSERT_MSG(param.getType() == XmlRpc::XmlRpcValue::TypeStruct, "Badly formed basler param yaml");
+        ROS_ASSERT_MSG(param.hasMember("name"), "Param needs name");
+        ROS_ASSERT_MSG(param.hasMember("type"), "Param needs type");
+        ROS_ASSERT_MSG(param.hasMember("value"), "Param needs value");
+        std::string name = param["name"];
+        std::string type = param["type"];
+        auto& value = param["value"];
+        if (type == "bool")
+        {
+            ROS_ASSERT_MSG(value.getType() == XmlRpc::XmlRpcValue::TypeBoolean,
+                           "Type of value for %s must be bool", name.c_str());
+            handle_basler_parameter<bool, GenApi::CBooleanPtr>(camera, name, value);
+        }
+        else if (type == "int")
+        {
+            ROS_ASSERT_MSG(value.getType() == XmlRpc::XmlRpcValue::TypeInt,
+                           "Type of value for %s must be int", name.c_str());
+            handle_basler_parameter<int, GenApi::CIntegerPtr>(camera, name, value);
+        }
+        else if (type == "float")
+        {
+            // xmlrpc uses doubles
+            ROS_ASSERT_MSG(value.getType() == XmlRpc::XmlRpcValue::TypeDouble,
+                           "Type of value for %s must be float", name.c_str());
+            handle_basler_parameter<double, GenApi::CFloatPtr>(camera, name, value);
+        }
+        else if (type == "enum")
+        {
+            ROS_ASSERT_MSG(value.getType() == XmlRpc::XmlRpcValue::TypeString,
+                           "Type of value for enum %s must be string", name.c_str());
+            handle_basler_enum_parameter(camera, name, value);
+        }
+        else
+        {
+            ROS_FATAL_STREAM("Unknown param type for parameter " << name << ": " << type);
+        }
     }
 }
