@@ -23,6 +23,7 @@ std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcVal
         std::string serial = std::to_string(int(cameras_yaml[index]["serial"]));
 
         bool camera_found = false;
+        ros::Time timeout_time = ros::Time::now() + ros::Duration(5);
         while(ros::ok() && !camera_found)
         {
             tl_factory.EnumerateDevices(devices);
@@ -38,11 +39,16 @@ std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcVal
             }
             if (!camera_found)
             {
-                ROS_INFO_STREAM("Failed to find camera " << index << " with serial " << serial);
-                ROS_INFO_STREAM( devices.size() << " other serials found:");
+                ROS_DEBUG_STREAM("Failed to find camera " << index << " with serial " << serial);
+                ROS_DEBUG_STREAM( devices.size() << " other serials found:");
                 for (size_t i = 0; i < devices.size(); ++i)
                 {
-                    ROS_INFO_STREAM(devices[i].GetSerialNumber());
+                    ROS_DEBUG_STREAM(devices[i].GetSerialNumber());
+                }
+                if (ros::Time::now() > timeout_time)
+                {
+                    ROS_ERROR_STREAM("Timed out looking for camera " << index << " with serial " << serial);
+                    return {};
                 }
                 r.sleep();
                 ros::spinOnce();
@@ -53,10 +59,11 @@ std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcVal
 }
 
 // Wait for all cameras to be slaves and to have same master clock id
-void waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras)
+bool waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras)
 {
-    ROS_INFO("Waiting for %zu cameras to be PTP slaves...", cameras.size());
+    ROS_DEBUG("Waiting for %zu cameras to be PTP slaves...", cameras.size());
     ros::Rate r(0.5);
+    ros::Time timeout_time = ros::Time::now() + ros::Duration(60);
     while (ros::ok())
     {
         int num_init = 0;
@@ -66,6 +73,8 @@ void waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras
         bool multiple_masters = false;
         for (const auto& camera : cameras)
         {
+            // The GevIEEE1588 prefix is for PTP-related calls.
+            // Using latched values ensures consistent query results.
             camera.GevIEEE1588DataSetLatch();
             switch(camera.GevIEEE1588StatusLatched())
             {
@@ -76,6 +85,10 @@ void waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras
             }
             case Basler_GigECamera::GevIEEE1588StatusLatched_Slave:
             {
+                // We want to make sure all cameras are synced to the same
+                // master clock. For the first slave we encounter, record
+                // its parent clock id, and then check if subsequent slaves
+                // all have the same parent clock id.
                 int64_t master_id = camera.GevIEEE1588ParentClockId();
                 if (num_slave == 0)
                 {
@@ -96,33 +109,45 @@ void waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras
         }
         if (num_slave == cameras.size() && !multiple_masters)
         {
-            ROS_INFO_STREAM("All camera clocks are PTP slaves to master clock " << master_clock_id);
-            break;
+            ROS_DEBUG_STREAM("All camera clocks are PTP slaves to master clock " << master_clock_id);
+            return true;
         }
         else if(num_slave == cameras.size())
         {
-            ROS_INFO("All camera clocks are PTP slaves, but multiple masters are present");
+            ROS_DEBUG("All camera clocks are PTP slaves, but multiple masters are present");
         }
         else
         {
-            ROS_INFO("Camera PTP status: %d initializing, %d masters, %d slaves", num_init, num_master, num_slave);
+            ROS_DEBUG("Camera PTP status: %d initializing, %d masters, %d slaves", num_init, num_master, num_slave);
+        }
+        if (ros::Time::now() > timeout_time)
+        {
+            ROS_ERROR("Timed out waiting for camera clocks to become PTP camera slaves. Current status: %d initializing, %d masters, %d slaves", num_init, num_master, num_slave);
+            return false;
         }
         r.sleep();
         ros::spinOnce();
     }
 }
 
-void waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras, int max_offset_ns, int offset_window_s)
+// Wait for all camera clocks to synchronize to the master clock. Synchronization is reached
+// when all clocks have an offset below max_offset_ns for offset_window_s seconds.
+// We do not track individual clock synchronization - rather we only consider the
+// largest offset from all cameras.
+bool waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras, int max_offset_ns, int offset_window_s)
 {
-    ROS_INFO("Waiting for clock offsets < %d ns over %d s...", max_offset_ns, offset_window_s);
+    ROS_DEBUG("Waiting for clock offsets < %d ns over %d s...", max_offset_ns, offset_window_s);
     bool currently_below = false;
     ros::Time below_start;
+    // Store the current offset for each camera
     std::vector<int64_t> current_offsets(cameras.size());
+    // Max of the abs of each value in current_offsets
     int64_t current_max_abs_offset = 0;
 
-    ros::Time last_output = ros::Time::now();
+    ros::Time timeout_time = ros::Time::now() + ros::Duration(60);
     while (ros::ok())
     {
+        // Get each camera's offset from master
         for (size_t i = 0; i < cameras.size(); ++i)
         {
             cameras[i].GevIEEE1588DataSetLatch();
@@ -131,6 +156,8 @@ void waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cam
         }
         if (current_max_abs_offset < max_offset_ns)
         {
+            // The largest clock offset is below our threshold, so start counting time,
+            // or check if we've met our time requirement
             if (!currently_below)
             {
                 currently_below = true;
@@ -138,32 +165,34 @@ void waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cam
             }
             else if ((ros::Time::now() - below_start).toSec() >= offset_window_s)
             {
-                break;
+                ROS_DEBUG("All clocks synced");
+                return true;
             }
         }
         else
         {
+            // The largest clock offset is above our threshold
             currently_below = false;
         }
-        // Print out current offsets periodically
-        if ((ros::Time::now()  - last_output).toSec() >= 1)
+        if (ros::Time::now() > timeout_time)
         {
-            ROS_INFO("Current clock offsets (target %d):", max_offset_ns);
+            ROS_ERROR("PTP clock synchronization timed out waiting for clocks to reach offsets < %d ns over %d s", max_offset_ns, offset_window_s);
+            ROS_ERROR("Current clock offsets:");
             for (size_t i = 0; i < cameras.size(); ++i)
             {
-                ROS_INFO_STREAM(i << ": " << current_offsets[i]);
+                ROS_ERROR_STREAM(i << ": " << current_offsets[i]);
             }
-            last_output = ros::Time::now();
+            return false;
         }
-
         ros::spinOnce();
     }
-    ROS_INFO("All clocks synced");
 }
 
 void enableSyncFreeRun(Pylon::CBaslerGigEInstantCamera& camera, float frame_rate)
 {
-    // See https://docs.baslerweb.com/synchronous-free-run.html for info.
+    // StartTimeLow and High specify a time offset for staggered capture.
+    // We set to 0 for all cameras for simultaneous capture.
+    // See https://docs.baslerweb.com/synchronous-free-run.html for more info.
     camera.SyncFreeRunTimerTriggerRateAbs.SetValue(frame_rate);
     camera.SyncFreeRunTimerStartTimeLow.SetValue(0);
     camera.SyncFreeRunTimerStartTimeHigh.SetValue(0);
@@ -198,6 +227,10 @@ int main(int argc, char* argv[])
 
     // Load cameras by serial
     std::vector<Pylon::CBaslerGigEInstantCamera> cameras = loadCameras(cameras_yaml);
+    if (cameras.empty())
+    {
+        return 1;
+    }
 
     // Set up camera infos
     for (size_t i = 0; i < cameras.size(); ++i)
@@ -227,13 +260,18 @@ int main(int argc, char* argv[])
     {
         camera.Open();
         handle_basler_parameters(camera);
+        // This enables PTP on the camera. (IEEE1588 is the PTP standard)
         camera.GevIEEE1588.SetValue(true);
     }
 
-    waitForPTPSlave(cameras);
-    waitForPTPClockSync(cameras, ptp_max_offset_ns, ptp_offset_window_s);
+    ROS_INFO("Waiting for camera PTP clock synchronization...");
+    if (!waitForPTPSlave(cameras) ||
+        !waitForPTPClockSync(cameras, ptp_max_offset_ns, ptp_offset_window_s))
+    {
+        return 1;
+    }
 
-    ROS_INFO("Starting image capture from %zu synced cameras", cameras.size());
+    ROS_INFO("All %zu cameras synced. Starting image capture.", cameras.size());
     for (auto& camera : cameras)
     {
         enableSyncFreeRun(camera, frame_rate);
