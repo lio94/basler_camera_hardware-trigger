@@ -9,6 +9,12 @@
 #include "basler_parameters.h"
 #include "image_publisher.h"
 
+namespace
+{
+const int load_camera_timeout = 5;
+const int ptp_sync_timeout = 60;
+}
+
 std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcValue& cameras_yaml)
 {
     Pylon::CTlFactory& tl_factory = Pylon::CTlFactory::GetInstance();
@@ -23,7 +29,7 @@ std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcVal
         std::string serial = std::to_string(int(cameras_yaml[index]["serial"]));
 
         bool camera_found = false;
-        ros::Time timeout_time = ros::Time::now() + ros::Duration(5);
+        ros::Time timeout_time = ros::Time::now() + ros::Duration(load_camera_timeout);
         while(ros::ok() && !camera_found)
         {
             tl_factory.EnumerateDevices(devices);
@@ -63,7 +69,7 @@ bool waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras
 {
     ROS_DEBUG("Waiting for %zu cameras to be PTP slaves...", cameras.size());
     ros::Rate r(0.5);
-    ros::Time timeout_time = ros::Time::now() + ros::Duration(60);
+    ros::Time timeout_time = ros::Time::now() + ros::Duration(ptp_sync_timeout);
     while (ros::ok())
     {
         int num_init = 0;
@@ -144,7 +150,7 @@ bool waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cam
     // Max of the abs of each value in current_offsets
     int64_t current_max_abs_offset = 0;
 
-    ros::Time timeout_time = ros::Time::now() + ros::Duration(60);
+    ros::Time timeout_time = ros::Time::now() + ros::Duration(ptp_sync_timeout);
     while (ros::ok())
     {
         // Get each camera's offset from master
