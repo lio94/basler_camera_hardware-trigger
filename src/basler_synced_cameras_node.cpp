@@ -154,6 +154,7 @@ bool waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cam
     while (ros::ok())
     {
         // Get each camera's offset from master
+        current_max_abs_offset = 0;
         for (size_t i = 0; i < cameras.size(); ++i)
         {
             cameras[i].GevIEEE1588DataSetLatch();
