@@ -239,6 +239,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    std::vector<std::shared_ptr<camera_info_manager::CameraInfoManager>> cinfo_managers(cameras.size());
     // Set up camera infos
     for (size_t i = 0; i < cameras.size(); ++i)
     {
@@ -253,11 +254,12 @@ int main(int argc, char* argv[])
         if(pnh.getParam("camera_info_dir", camera_info_dir))
             camera_info_url = camera_info_dir + "/" + camera_info_url;
 
-        camera_info_manager::CameraInfoManager cinfo_manager(nh, name);
-        cinfo_manager.loadCameraInfo(camera_info_url);
+        ros::NodeHandle camera_nh(nh, name);
+        cinfo_managers[i] = std::make_shared<camera_info_manager::CameraInfoManager>(camera_nh, name);
+        cinfo_managers[i]->loadCameraInfo(camera_info_url);
 
         sensor_msgs::CameraInfo::Ptr cinfo(
-            new sensor_msgs::CameraInfo(cinfo_manager.getCameraInfo()));
+            new sensor_msgs::CameraInfo(cinfo_managers[i]->getCameraInfo()));
         cameras[i].RegisterImageEventHandler(new Pylon::ImagePublisher(nh, cinfo, frame_id, name + "/", true), Pylon::RegistrationMode_Append, Pylon::Cleanup_Delete);
         cameras[i].RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration, Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
     }
