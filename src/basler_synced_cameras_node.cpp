@@ -268,6 +268,9 @@ int main(int argc, char* argv[])
     for (auto& camera : cameras)
     {
         camera.Open();
+        // First reset to default values.
+        camera.UserSetSelector.SetValue(Basler_GigECamera::UserSetSelectorEnums::UserSetSelector_Default);
+        camera.UserSetLoad();
         handle_basler_parameters(camera);
         // This enables PTP on the camera. (IEEE1588 is the PTP standard)
         camera.GevIEEE1588.SetValue(true);
