@@ -271,9 +271,10 @@ int main(int argc, char* argv[])
         // First reset to default values.
         camera.UserSetSelector.SetValue(Basler_GigECamera::UserSetSelectorEnums::UserSetSelector_Default);
         camera.UserSetLoad();
-        handle_basler_parameters(camera);
         // This enables PTP on the camera. (IEEE1588 is the PTP standard)
+        // We enable PTP before setting other camera parameters, since the GevSCPD parameter in particular has different units depending on if PTP is on or off.
         camera.GevIEEE1588.SetValue(true);
+        handle_basler_parameters(camera);
     }
 
     ROS_INFO("Waiting for camera PTP clock synchronization...");
