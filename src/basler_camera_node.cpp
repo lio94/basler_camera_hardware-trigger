@@ -54,46 +54,37 @@ int main(int argc, char* argv[])
     DeviceInfoList_t devices;
     CInstantCamera camera;
 
-    
-    bool camera_found = false;
-
-    if (!camera_found)
+    if (tlFactory.EnumerateDevices(devices) == 0)
     {
-        ros::Time end = ros::Time::now() + ros::Duration(15.0);
-        ros::Rate r(0.5);
-        
-        while ( ros::ok() && !camera_found )
+        ROS_WARN_STREAM("No devices found. Exiting node...");
+        return 1;
+    }
+    if (serial_number == "")
+    {
+        // Create an instant camera object for the camera device found first.
+        camera.Attach(CTlFactory::GetInstance().CreateFirstDevice());
+    }
+    else
+    {
+        bool camera_found = false;
+        // Look up the camera by its serial number
+        ROS_INFO_STREAM("Camera serials found: ");
+        for (size_t i=0; i<devices.size(); i++) 
         {
-            ROS_INFO_STREAM("Looking for Camera");
-            if (tlFactory.EnumerateDevices(devices) == 0)
+            ROS_INFO_STREAM(devices[i].GetSerialNumber());
+            if (devices[i].GetSerialNumber().c_str() == serial_number)
             {
-                ROS_INFO_STREAM("No devices found. Still searching...");
+                ROS_INFO_STREAM("Found camera with matching serial " << serial_number);
+                camera.Attach(tlFactory.CreateDevice(devices[i]));
+                camera_found = true;
             }
-            if (serial_number == "") 
-            {
-                // Create an instant camera object for the camera device found first.
-                camera.Attach(CTlFactory::GetInstance().CreateFirstDevice());
-                
-            } 
-            else 
-            {
-                // Look up the camera by its serial number
-                ROS_INFO_STREAM("Camera serials found: ");
-                for (size_t i=0; i<devices.size(); i++) 
-                {
-                    ROS_INFO_STREAM(devices[i].GetSerialNumber());
-                    if (devices[i].GetSerialNumber().c_str() == serial_number) 
-                    {
-                        ROS_INFO_STREAM("Found camera with matching serial " << serial_number);
-                        camera.Attach(tlFactory.CreateDevice(devices[i]));
-                        camera_found = true;
-                    }
-                }
-            }
-            r.sleep();
-            ros::spinOnce();
         }
-    }   
+        if (!camera_found)
+        {
+            ROS_WARN_STREAM("Failed to find camera with matching serial");
+            return 1;
+        }
+    }
     ROS_INFO_STREAM("Using Camera: " << camera.GetDeviceInfo().GetModelName());
 
     camera.GrabCameraEvents = true;
