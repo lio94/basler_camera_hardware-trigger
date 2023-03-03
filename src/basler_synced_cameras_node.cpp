@@ -63,7 +63,7 @@ std::vector<Pylon::CBaslerGigEInstantCamera> loadCameras(const XmlRpc::XmlRpcVal
     }
     return cameras;
 }
-
+/*
 // Wait for all cameras to be slaves and to have same master clock id
 bool waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras)
 {
@@ -136,6 +136,7 @@ bool waitForPTPSlave(const std::vector<Pylon::CBaslerGigEInstantCamera>& cameras
     }
 }
 
+
 // Wait for all camera clocks to synchronize to the master clock. Synchronization is reached
 // when all clocks have an offset below max_offset_ns for offset_window_s seconds.
 // We do not track individual clock synchronization - rather we only consider the
@@ -194,7 +195,7 @@ bool waitForPTPClockSync(const std::vector<Pylon::CBaslerGigEInstantCamera>& cam
         ros::spinOnce();
     }
 }
-
+*/
 void enableSyncFreeRun(Pylon::CBaslerGigEInstantCamera& camera, float frame_rate)
 {
     // StartTimeLow and High specify a time offset for staggered capture.
@@ -261,7 +262,7 @@ int main(int argc, char* argv[])
         sensor_msgs::CameraInfo::Ptr cinfo(
             new sensor_msgs::CameraInfo(cinfo_managers[i]->getCameraInfo()));
         cameras[i].RegisterImageEventHandler(new Pylon::ImagePublisher(nh, cinfo, frame_id, name + "/", true), Pylon::RegistrationMode_Append, Pylon::Cleanup_Delete);
-        cameras[i].RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration, Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
+        cameras[i].RegisterConfiguration(new Pylon::CHardwareTriggerConfiguration, Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
     }
 
     // Open cameras so we can change settings, then set basler params and enable PTP
@@ -269,26 +270,26 @@ int main(int argc, char* argv[])
     {
         camera.Open();
         // First reset to default values.
-        camera.UserSetSelector.SetValue(Basler_GigECamera::UserSetSelectorEnums::UserSetSelector_Default);
+        camera.UserSetSelector.SetValue(Basler_GigECamera::UserSetSelectorEnums::UserSetSelector_UserSet1);
         camera.UserSetLoad();
         // This enables PTP on the camera. (IEEE1588 is the PTP standard)
         // We enable PTP before setting other camera parameters, since the GevSCPD parameter in particular has different units depending on if PTP is on or off.
-        camera.GevIEEE1588.SetValue(true);
+        // camera.GevIEEE1588.SetValue(true);
         handle_basler_parameters(camera);
     }
 
-    ROS_INFO("Waiting for camera PTP clock synchronization...");
-    if (!waitForPTPSlave(cameras) ||
-        !waitForPTPClockSync(cameras, ptp_max_offset_ns, ptp_offset_window_s))
-    {
-        return 1;
-    }
+    //ROS_INFO("Waiting for camera PTP clock synchronization...");
+    //if (!waitForPTPSlave(cameras) ||
+    //    !waitForPTPClockSync(cameras, ptp_max_offset_ns, ptp_offset_window_s))
+    //{
+    //    return 1;
+    //}
 
     ROS_INFO("All %zu cameras synced. Starting image capture.", cameras.size());
     for (auto& camera : cameras)
     {
         enableSyncFreeRun(camera, frame_rate);
-        camera.StartGrabbing();
+        camera.StartGrabbing(Pylon::GrabStrategy_LatestImageOnly);
     }
 
     Pylon::CGrabResultPtr grab_result;
