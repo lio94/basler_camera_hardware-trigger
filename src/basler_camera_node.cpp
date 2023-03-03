@@ -97,7 +97,8 @@ int main(int argc, char* argv[])
         new sensor_msgs::CameraInfo(cinfo_manager_.getCameraInfo()));
 
     camera.RegisterImageEventHandler(new ImagePublisher(nh, cinfo, frame_id), RegistrationMode_Append, Cleanup_Delete);
-    camera.RegisterConfiguration(new CAcquireContinuousConfiguration , RegistrationMode_ReplaceAll, Cleanup_Delete);
+    //camera.RegisterConfiguration(new CAcquireContinuousConfiguration , RegistrationMode_ReplaceAll, Cleanup_Delete);
+    camera.RegisterConfiguration(new CHardwareTriggerConfiguration , RegistrationMode_ReplaceAll, Cleanup_Delete);
 
     camera.Open();
 
@@ -113,9 +114,11 @@ int main(int argc, char* argv[])
     if (IsAvailable(pixelFormat->GetEntryByName("RGB8")))
     {
         pixelFormat->FromString("RGB8");
+	ROS_INFO_STREAM("Changed pixel format to RGB8.");
     }
 
-    camera.StartGrabbing();
+    //camera.StartGrabbing();
+    camera.StartGrabbing(GrabStrategy_LatestImageOnly);
     ROS_INFO_STREAM("Image capture start");
     while (camera.IsGrabbing() && ros::ok())
     {
