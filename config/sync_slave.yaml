@@ -2,11 +2,11 @@ basler_params:
   -
     name: AcquisitionFrameRateAbs
     type: float
-    value: 5.0
+    value: 100.0
   -
     name: ExposureTimeAbs
     type: float
-    value: 100000.0
+    value: 20000.0
   -
     name: AcquisitionMode
     type: enum
@@ -20,11 +20,11 @@ basler_params:
     type: enum
     value: 'On'
   -
-    name: LineSelector
+    name: TriggerSource
     type: enum
     value: Line1
   -
-    name: TriggerSource
+    name: LineSelector
     type: enum
     value: Line1
   -
@@ -34,7 +34,7 @@ basler_params:
   -
     name: TriggerSelector
     type: enum
-    value: AcquisitionStart 
+    value: FrameStart 
   -
     name: TriggerActivation
     type: enum
@@ -42,8 +42,12 @@ basler_params:
   -
     name: GevSCPSPacketSize
     type: int
-    value: 8192
+    value: 9000
   -
     name: GevSCPD
     type: int
-    value: 50000
+    value: 9021
+  -
+    name: GevSCFTD
+    type: int
+    value: 0
